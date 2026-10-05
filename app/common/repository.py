@@ -20,3 +20,7 @@ class BaseRepository(Generic[ModelT]):
         self._session.add(entity)
         await self._session.flush() # assigns PK/defaults, still inside the transaction
         return entity
+
+    async def delete(self, entity: ModelT) -> None:
+        await self._session.delete(entity)
+        await self._session.flush()
