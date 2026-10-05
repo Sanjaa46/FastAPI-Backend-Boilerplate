@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 7
+    registration_enabled: bool = True  # false => POST /auth/register returns 403
 
     @model_validator(mode="after")
     def _reject_unsafe_production(self) -> "Settings":
