@@ -42,7 +42,7 @@ async def ready(
         await broker_redis.ping()
         checks["redis_broker"] = "ok"
     except Exception:
-        log.warnin("readiness_redis_broker_failed", exc_info=True)
+        log.warning("readiness_redis_broker_failed", exc_info=True)
         checks["redis_broker"] = "fail"
 
     if all(v == "ok" for v in checks.values()):
