@@ -253,6 +253,7 @@ get_redis_cache(request)      ─┼─►  get_user_repository(session)
 ```python
 # app/core/dependencies.py
 """Shared, typed dependency aliases. Routers import these instead of writing Depends() inline."""
+
 from typing import Annotated
 
 from fastapi import Depends
@@ -269,6 +270,7 @@ RedisCacheDep = Annotated[Redis, Depends(get_redis_cache)]
 ```python
 # app/modules/users/dependencies.py
 """Wiring for the users module. This is the only place that knows how to construct UserService."""
+
 from typing import Annotated
 
 from fastapi import Depends
@@ -303,6 +305,7 @@ UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 ```python
 # app/modules/users/router.py
 """HTTP surface for users. No SQL, no business logic."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, status
@@ -337,6 +340,7 @@ All config comes from environment variables, validated at startup. The app **ref
 ```python
 # app/core/config.py
 """Typed application settings. Single source of truth for all configuration."""
+
 from functools import lru_cache
 from typing import Literal
 
@@ -352,14 +356,14 @@ class Settings(BaseSettings):
     environment: Literal["local", "test", "staging", "production"] = "local"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = []          # env: CORS_ORIGINS='["https://app.example.com"]'
+    cors_origins: list[str] = []  # env: CORS_ORIGINS='["https://app.example.com"]'
 
     # --- Logging ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-    log_json: bool = True                 # false => human-readable console output
+    log_json: bool = True  # false => human-readable console output
 
     # --- PostgreSQL ---
-    database_url: PostgresDsn             # postgresql+asyncpg://user:pass@host:5432/db
+    database_url: PostgresDsn  # postgresql+asyncpg://user:pass@host:5432/db
     db_pool_size: int = 10
     db_max_overflow: int = 10
     db_pool_recycle_seconds: int = 1800
@@ -434,6 +438,7 @@ POSTGRES_DB=app
 ```python
 # app/core/database.py
 """Async SQLAlchemy setup: Base, engine/session factories, request-scoped session."""
+
 from collections.abc import AsyncIterator
 
 from fastapi import Request
@@ -490,6 +495,7 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 ```python
 # app/common/models.py
 """Mixins every table gets by default."""
+
 import uuid
 from datetime import datetime
 
@@ -502,9 +508,7 @@ class UUIDPrimaryKeyMixin:
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -515,6 +519,7 @@ class TimestampMixin:
 ```python
 # app/common/repository.py
 """Generic repository. Repositories flush; they never commit."""
+
 from typing import Generic, TypeVar
 from uuid import UUID
 
@@ -567,6 +572,7 @@ file_template = %%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)
 ```python
 # migrations/env.py
 """Alembic environment (async). Reads the DB URL from app settings, not alembic.ini."""
+
 import asyncio
 from logging.config import fileConfig
 
@@ -605,7 +611,7 @@ def do_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        compare_type=True,            # detect column type changes
+        compare_type=True,  # detect column type changes
         compare_server_default=True,  # detect server_default changes
     )
     with context.begin_transaction():
@@ -632,6 +638,7 @@ else:
 ```python
 # app/models.py
 """Import every module's models here so Alembic autogenerate can see them."""
+
 from app.modules.users.models import User  # noqa: F401
 ```
 
@@ -664,6 +671,7 @@ uv run alembic check                 # fails if models and migrations disagree
 ```python
 # app/core/redis.py
 """Redis client factories. One pool per Redis instance, created in lifespan."""
+
 from fastapi import Request
 from redis.asyncio import Redis
 
@@ -686,6 +694,7 @@ async def get_redis_cache(request: Request) -> Redis:
 
 Contract: a Redis failure NEVER fails the request. We log and fall through to the loader.
 """
+
 import random
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -777,8 +786,8 @@ class UserService:
         if user is None:
             raise UserNotFoundError(user_id)
         user.name = name
-        await self._session.commit()                 # 1) commit first
-        await self._cache.delete(self._key(user_id)) # 2) then invalidate
+        await self._session.commit()  # 1) commit first
+        await self._cache.delete(self._key(user_id))  # 2) then invalidate
         return UserRead.model_validate(user)
 ```
 
@@ -824,6 +833,7 @@ All three use the **same image**; only the command differs.
 ```python
 # app/worker/broker.py
 """Taskiq broker wired to FastAPI so tasks can reuse FastAPI dependencies."""
+
 import taskiq_fastapi
 from taskiq import SimpleRetryMiddleware
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
@@ -848,6 +858,7 @@ Because the worker runs the **FastAPI lifespan**, the engine, session factory an
 ```python
 # app/main.py
 """Application factory and lifespan."""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -909,6 +920,7 @@ app = create_app()
 ```python
 # app/modules/users/tasks.py
 """Background tasks owned by the users module."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -930,6 +942,7 @@ async def send_welcome_email(
 ```python
 # app/worker/tasks.py
 """Task discovery: the worker CLI imports this module; import every module's tasks here."""
+
 from app.modules.users import tasks as users_tasks  # noqa: F401
 ```
 
@@ -949,8 +962,10 @@ from typing import Annotated
 from fastapi import Request
 from taskiq import TaskiqDepends
 
-async def get_session(request: Annotated[Request, TaskiqDepends()]) -> AsyncIterator[AsyncSession]:
-    ...
+
+async def get_session(
+    request: Annotated[Request, TaskiqDepends()],
+) -> AsyncIterator[AsyncSession]: ...
 ```
 
 Apply this to `get_session` and `get_redis_cache`. In HTTP requests it behaves identically. **VERIFY** with a smoke test (a task that opens a session and runs `SELECT 1`) — this is a required test in §13.
@@ -960,6 +975,7 @@ Apply this to `get_session` and `get_redis_cache`. In HTTP requests it behaves i
 ```python
 # app/worker/scheduler.py
 """Cron/interval scheduling. Run exactly ONE scheduler process."""
+
 from taskiq import TaskiqScheduler
 from taskiq.schedule_sources import LabelScheduleSource
 
@@ -1001,6 +1017,7 @@ One shape for all errors:
 # app/core/exceptions.py  (excerpt)
 class AppError(Exception):
     """Base for all expected errors. Subclasses set status_code and code."""
+
     status_code: int = 500
     code: str = "internal_error"
 
@@ -1093,6 +1110,7 @@ One shared loop avoids asyncpg "attached to a different loop" errors when the en
 ```python
 # tests/conftest.py
 """Test infrastructure: isolated DB per test via SAVEPOINT rollback, DI overrides."""
+
 from collections.abc import AsyncIterator
 
 import pytest
@@ -1108,7 +1126,7 @@ TEST_DATABASE_URL = "postgresql+asyncpg://app:app@localhost:5432/app_test"
 @pytest.fixture(scope="session")
 async def engine() -> AsyncIterator[AsyncEngine]:
     eng = create_async_engine(TEST_DATABASE_URL)
-    async with eng.begin() as conn:                # simplest: create schema from models.
+    async with eng.begin() as conn:  # simplest: create schema from models.
         await conn.run_sync(Base.metadata.create_all)  # Migrations are verified separately in CI.
     yield eng
     await eng.dispose()

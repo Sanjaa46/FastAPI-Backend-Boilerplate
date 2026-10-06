@@ -10,9 +10,8 @@ from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, StringConstraints
 
-
 PASSWORD_MIN_LENGTH = 10
-PASSWORD_MAX_LENGTH = 128   # upper bound also caps argon2 CPU cost per request
+PASSWORD_MAX_LENGTH = 128  # upper bound also caps argon2 CPU cost per request
 
 
 def _normalize_email(value: str) -> str:

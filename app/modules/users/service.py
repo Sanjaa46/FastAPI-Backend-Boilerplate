@@ -43,7 +43,6 @@ class UserService:
         self._cache = cache
         self._session = session
 
-
     # --------------------------------------- helpers
 
     def _key(self, user_id: UUID) -> str:
@@ -72,6 +71,7 @@ class UserService:
             await send_welcome_email.kiq(str(user_id))  # type: ignore[call-overload]
         except Exception:
             log.warning("welcome_email_enqueue_failed", user_id=str(user_id), exc_info=True)
+
     # --------------------------------------------- queries
 
     async def get_user(self, user_id: UUID) -> UserRead:
@@ -109,7 +109,7 @@ class UserService:
         if await self._repo.get_by_email(payload.email) is not None:
             raise EmailAlreadyExistsError()
 
-        password_hash = await asyncio.to_thread(hash_password, payload.password)    # CPU-bound
+        password_hash = await asyncio.to_thread(hash_password, payload.password)  # CPU-bound
         if isinstance(payload, AdminUserCreate):
             is_active, is_superuser = payload.is_active, payload.is_superuser
         else:
@@ -130,7 +130,7 @@ class UserService:
             raise EmailAlreadyExistsError() from exc
 
         created = UserRead.model_validate(user)
-        await self._enqueue_welcome_email(created.id)   # after commit, never before
+        await self._enqueue_welcome_email(created.id)  # after commit, never before
         return created
 
     async def update_profile(self, user_id: UUID, payload: UserUpdateMe) -> UserRead:
@@ -150,7 +150,7 @@ class UserService:
         if user_id == actor_id:
             raise SelfModificationError("You cannot delete yourself")
         user = await self._get_or_raise(user_id)
-        await self._repo.delete(user)   # refresh tokens are removed by on DELETE CASCADE
+        await self._repo.delete(user)  # refresh tokens are removed by on DELETE CASCADE
         await self._session.commit()
         await self._cache.delete(self._key(user_id))
 

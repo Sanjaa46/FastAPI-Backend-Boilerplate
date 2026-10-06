@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import PostgresDsn, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
@@ -12,14 +13,14 @@ class Settings(BaseSettings):
     environment: Literal["local", "test", "staging", "production"] = "local"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = []            # env: CORS_ORIGINS='["https://app.example.com"]'
+    cors_origins: list[str] = []  # env: CORS_ORIGINS='["https://app.example.com"]'
 
     # --- Logging ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-    log_json: bool = True                   # False => human-readable console output
+    log_json: bool = True  # False => human-readable console output
 
     # --- PostgreSQL ---
-    database_url: PostgresDsn               # postgresql+asyncpg://user:pass@host:5432/db
+    database_url: PostgresDsn  # postgresql+asyncpg://user:pass@host:5432/db
     db_pool_size: int = 10
     db_max_overflow: int = 10
     db_pool_recycle_seconds: int = 1800
@@ -49,6 +50,7 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET_KEY must be set to a strong secret in production")
         return self
 
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()   # type: ignore[call-arg]  # values come from the environment
+    return Settings()  # type: ignore[call-arg]  # values come from the environment

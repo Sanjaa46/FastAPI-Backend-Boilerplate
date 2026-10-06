@@ -14,7 +14,7 @@ log = structlog.get_logger()
 
 @broker.task(
     task_name="auth.purge_expired_refresh_tokens",
-    schedule=[{"cron": "0 * * * *"}],   # hourly; requires exactly ONE scheduler process
+    schedule=[{"cron": "0 * * * *"}],  # hourly; requires exactly ONE scheduler process
 )
 async def purge_expired_refresh_tokens(
     session: Annotated[AsyncSession, TaskiqDepends(get_session)],

@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 
-from app.modules.health.router import router as health_router
 from app.modules.auth.router import router as auth_router
 from app.modules.users.router import router as users_router
 

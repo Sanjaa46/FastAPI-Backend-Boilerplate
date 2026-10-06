@@ -7,6 +7,7 @@ from app.core.database import Base
 
 ModelT = TypeVar("ModelT", bound=Base)
 
+
 class BaseRepository(Generic[ModelT]):
     model: type[ModelT]
 
@@ -18,7 +19,7 @@ class BaseRepository(Generic[ModelT]):
 
     async def add(self, entity: ModelT) -> ModelT:
         self._session.add(entity)
-        await self._session.flush() # assigns PK/defaults, still inside the transaction
+        await self._session.flush()  # assigns PK/defaults, still inside the transaction
         return entity
 
     async def delete(self, entity: ModelT) -> None:

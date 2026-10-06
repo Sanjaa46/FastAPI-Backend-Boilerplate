@@ -48,8 +48,6 @@ class AuthService:
         self._session = session
         self._settings = settings
 
-
-
     # ------------------------------- helpers
     async def _issue_tokens(self, user_id: uuid.UUID, family_id: uuid.UUID) -> TokenPair:
         """Create an access+refresh pair and persist the refresh row. Does NOT commit."""

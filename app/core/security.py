@@ -35,6 +35,7 @@ def _dummy_hash() -> str:
     """A valid hash of a throwaway value, computed once per process."""
     return hash_password("timing-equalizer-not-a-real-password")
 
+
 def verify_dummy_password(plain: str) -> None:
     """Burn the same CPU as a real verification.
 
@@ -42,6 +43,7 @@ def verify_dummy_password(plain: str) -> None:
     are registered (user-enumeration timing attack).
     """
     _password_hash.verify(plain, _dummy_hash())
+
 
 @dataclass
 class TokenPayload:
@@ -89,7 +91,7 @@ def decode_token(token: str, settings: Settings, *, expected_type: TokenType) ->
     try:
         claims = jwt.decode(
             token,
-            settings.jwt_secret_key,
+            settings.jwt_secret_key.get_secret_value(),
             algorithms=[settings.jwt_algorithm],
             options={"require": ["exp", "sub", "jti", "type"]},
         )

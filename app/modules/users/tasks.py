@@ -14,7 +14,7 @@ log = structlog.get_logger()
 
 @broker.task(task_name="users.send_welcome_email", retry_on_error=True, max_retries=3)
 async def send_welcome_email(
-    user_id: str,   # primitives only: payloads are serialized (UUID is passed as a string)
+    user_id: str,  # primitives only: payloads are serialized (UUID is passed as a string)
     session: Annotated[AsyncSession, TaskiqDepends(get_session)],
 ) -> None:
     """Send the welcome email. Idempotent: running twice only sends a duplicate email.

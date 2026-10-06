@@ -12,20 +12,25 @@ from app.core.dependencies import SessionDep
 log = structlog.get_logger()
 router = APIRouter()
 
+
 class LiveResponse(BaseModel):
     status: Literal["ok"] = "ok"
+
 
 class ReadyResponse(BaseModel):
     status: Literal["ok", "unavailable"]
     checks: dict[str, Literal["ok", "fail"]]
 
+
 async def get_redis_broker(request: Request) -> Redis:
     redis: Redis = request.app.state.redis_broker
     return redis
 
+
 @router.get("/live", response_model=LiveResponse)
 async def live() -> LiveResponse:
     return LiveResponse()
+
 
 @router.get("/ready", response_model=ReadyResponse)
 async def ready(

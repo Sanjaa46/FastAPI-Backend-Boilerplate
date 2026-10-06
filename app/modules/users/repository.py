@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from app.common.repository import BaseRepository
 from app.modules.users.models import User
 
+
 class UserRepository(BaseRepository[User]):
     model = User
 

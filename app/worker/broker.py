@@ -7,7 +7,7 @@ from app.core.config import get_settings
 _settings = get_settings()
 
 broker: AsyncBroker
-if _settings.environment =="test":
+if _settings.environment == "test":
     broker = InMemoryBroker()
 else:
     # Redis Streams give acknowledgements => at-least-once delivery. Tasks MUST be idempotent.

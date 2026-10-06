@@ -14,7 +14,9 @@ from app.modules.users.schemas import UserRead
 
 # auto_error=False: we raise our own 401 so the body matches the shared error envelope.
 bearer_schema = HTTPBearer(auto_error=False, description="Access token from POST /auth/login")
-def  get_auth_service(
+
+
+def get_auth_service(
     users: UserServiceDep, session: SessionDep, settings: SettingsDep
 ) -> AuthService:
     return AuthService(users, RefreshTokenRepository(session), session, settings)
@@ -30,7 +32,7 @@ async def get_current_user(
         raise UnauthorizedError()
     claims = decode_token(credentials.credentials, settings, expected_type="access")
     try:
-        user = await users.get_user(claims.subject) # cached read (short TTL)
+        user = await users.get_user(claims.subject)  # cached read (short TTL)
     except UserNotFoundError as exc:
         raise InvalidTokenError from exc
     if not user.is_active:
@@ -45,6 +47,7 @@ async def get_current_superuser(
     if not user.is_superuser:
         raise ForbiddenError("Administrator privilages required")
     return user
+
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 CurrentUserDep = Annotated[UserRead, Depends(get_current_user)]

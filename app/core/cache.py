@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 log = structlog.get_logger()
-ModelT =TypeVar("ModelT", bound=BaseModel)
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class CacheService:
@@ -32,7 +32,7 @@ class CacheService:
     async def set(self, key: str, value: BaseModel, ttl: int | None = None) -> None:
         base_ttl = ttl or self._default_ttl
         # Jitter (+0-10%) spreads expirations so hot keys don't all expire together.
-        expire = base_ttl + random.randint(0, max(1, base_ttl // 10))   # noqa: S311
+        expire = base_ttl + random.randint(0, max(1, base_ttl // 10))  # noqa: S311
         try:
             await self._redis.set(key, value.model_dump_json(), ex=expire)
         except RedisError:

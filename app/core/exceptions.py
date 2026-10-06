@@ -15,8 +15,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = structlog.get_logger()
 
+
 class AppError(Exception):
     """Base for all expected errors. Subclasses set status_code and code."""
+
     status_code: int = 500
     code: str = "internal_error"
 
@@ -34,7 +36,7 @@ class AppError(Exception):
 
 class BadRequestError(AppError):
     status_code = 400
-    code ="bad_request"
+    code = "bad_request"
 
 
 class UnauthorizedError(AppError):
@@ -72,6 +74,7 @@ def _request_id() -> str | None:
     value = structlog.contextvars.get_contextvars().get("request_id")
     return str(value) if value is not None else None
 
+
 def _error_response(
     status_code: int,
     code: str,
@@ -85,12 +88,14 @@ def _error_response(
     }
     return JSONResponse(status_code=status_code, content=body, headers=headers)
 
+
 async def _handle_app_error(_: Request, exc: Exception) -> JSONResponse:
-    err = cast(AppError, exc)   # registered for Apperror only
+    err = cast(AppError, exc)  # registered for Apperror only
     return _error_response(err.status_code, err.code, err.message, err.details, err.headers)
 
+
 async def _handle_validation_error(_: Request, exc: Exception) -> JSONResponse:
-    errors = cast(RequestValidationError, exc).errors() # registered for this type only
+    errors = cast(RequestValidationError, exc).errors()  # registered for this type only
     # Drop `input`/`ctx` (can echo secrets such as passwords); keep location + message
     details = [
         {"loc": [str(p) for p in err["loc"]], "msg": err["mst"], "type": err["type"]}
@@ -98,8 +103,9 @@ async def _handle_validation_error(_: Request, exc: Exception) -> JSONResponse:
     ]
     return _error_response(422, "validation_error", "Request validation failed", details)
 
+
 async def _handle_http_exception(_: Request, exc: Exception) -> JSONResponse:
-    http_exc = cast(StarletteHTTPException, exc)    # register for this type only
+    http_exc = cast(StarletteHTTPException, exc)  # register for this type only
     return _error_response(
         http_exc.status_code,
         f"http_{http_exc.status_code}",
@@ -107,10 +113,12 @@ async def _handle_http_exception(_: Request, exc: Exception) -> JSONResponse:
         headers=dict(http_exc.headers) if http_exc.headers else None,
     )
 
+
 async def _handle_unexpected(_: Request, exc: Exception) -> JSONResponse:
     # Full traceback goes to the logs; the client only gets a generic message.
     log.error("unhandled_exception", exc_info=exc)
     return _error_response(500, "internal_error", "Internal server error")
+
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach all handlers. Called once from create_app()"""

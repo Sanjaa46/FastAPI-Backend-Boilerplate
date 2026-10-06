@@ -7,6 +7,7 @@ from app.core.dependencies import RedisCacheDep, SessionDep, SettingsDep
 from app.modules.users.repository import UserRepository
 from app.modules.users.service import UserService
 
+
 def get_user_service(
     session: SessionDep,
     redis: RedisCacheDep,

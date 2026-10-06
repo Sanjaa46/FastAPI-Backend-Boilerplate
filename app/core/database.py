@@ -21,8 +21,10 @@ NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
 }
 
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
 
 def create_engine(settings: Settings) -> AsyncEngine:
     return create_async_engine(
@@ -30,16 +32,18 @@ def create_engine(settings: Settings) -> AsyncEngine:
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
         pool_recycle=settings.db_pool_recycle_seconds,
-        pool_pre_ping=True,     # detect dead connections after DB restarts
+        pool_pre_ping=True,  # detect dead connections after DB restarts
     )
+
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     # expire_on_commit=False: attributes stay readable after commit (no implicit lazy
     # reload, which raises MissingGreenlet in async code).
     return async_sessionmaker(engine, expire_on_commit=False)
 
+
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """One session per request. Does NOT commit; services own the transaction."""
     factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
     async with factory() as session:
-        yield session   # closing the context rolls back anything uncommitted
+        yield session  # closing the context rolls back anything uncommitted

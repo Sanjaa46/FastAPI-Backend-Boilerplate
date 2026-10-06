@@ -5,6 +5,7 @@ from sqlalchemy.sql import expression
 from app.common.models import TimeStampMixin, UUIDPrimaryKeyMixin
 from app.core.database import Base
 
+
 class User(UUIDPrimaryKeyMixin, TimeStampMixin, Base):
     __tablename__ = "users"
     # Fetch server-generated values (updated_at) after UPDATE via RETURNING, so reading them
