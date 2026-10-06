@@ -37,6 +37,7 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes: ["brokerdata:/data"]
+    ports: ["6380:6379"]
     healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10 }
 
   migrate:                               # one-shot: apply migrations, then exit
