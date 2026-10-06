@@ -1,6 +1,7 @@
 """Pure-ASGI middleware (no BaseHTTPMiddleware: it breaks contextvars and streaming).
 
-Order (outermost first): request context -> security headers -> CORS -> trusted hosts.
+Order (outermost first): request context -> rate limit headers -> security headers -> CORS ->
+trusted hosts.
 """
 
 import re
@@ -87,6 +88,34 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)
 
 
+class RateLimitHeadersMiddleware:
+    """Reports the tightest rate limit that applied to the request (X-RateLimit-*).
+
+    The limits are checked in dependencies (app/core/rate_limit.py), which leave the result
+    on `request.state`. A middleware, not `Response` injection, so routes that return their
+    own Response (e.g. 204) and error responses carry the headers too.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                result = scope.get("state", {}).get("rate_limit")  # a RateLimitResult
+                if result is not None:
+                    headers = MutableHeaders(scope=message)
+                    headers.setdefault("X-RateLimit-Limit", str(result.limit))
+                    headers.setdefault("X-RateLimit-Remaining", str(result.remaining))
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 def register_middleware(app: FastAPI, settings: Settings) -> None:
     """Attach middleware. add_middleware() prepends, so the LAST one added is outermost."""
     is_prod = settings.environment == "production"
@@ -100,6 +129,9 @@ def register_middleware(app: FastAPI, settings: Settings) -> None:
             allow_credentials=False,
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+            # Not readable by browser clients unless exposed.
+            expose_headers=["Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
         )
     app.add_middleware(SecurityHeadersMiddleware, hsts=is_prod)
+    app.add_middleware(RateLimitHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)

@@ -1059,7 +1059,42 @@ Register handlers for `AppError`, `RequestValidationError` (normalized to the sa
 `structlog` configured once in `core/logging.py`: JSON in non-local environments, console renderer locally; stdlib/uvicorn loggers routed through it. Always log with key/value pairs (`log.info("user_created", user_id=...)`). Never log passwords, tokens, or full request bodies.
 
 ### 11.8 Rate limiting (optional, off by default)
-Prefer the reverse proxy/API gateway. If needed in-app, implement a Redis fixed/sliding-window dependency on `redis-cache`.
+
+Prefer the reverse proxy/API gateway for coarse, volumetric limits. The app adds what a proxy cannot see: **who the caller is** (the user ID in the token, the email being logged into). Enable with `RATE_LIMIT_ENABLED=true`; with it off, nothing is checked and no headers are added.
+
+**Mechanism** (`app/core/rate_limit.py`). A sliding-window counter in one atomic Lua script on `redis-cache`: two small keys per client, O(1), no 2x burst at window edges, and rejected requests are not counted, so `Retry-After` is exact. Limits are FastAPI **dependencies**, not middleware: they are per-route, run before auth and the database, and can read the token. Over the limit: `429` in the standard error envelope (`code: rate_limited`) with `Retry-After`. Every response carries `X-RateLimit-Limit` / `X-RateLimit-Remaining` of the tightest limit that applied (`RateLimitHeadersMiddleware`).
+
+| Limit | Counted per | Applies to | Setting (default) |
+|---|---|---|---|
+| Umbrella | client IP | every `/api/v1` route (not `/health`) | `RATE_LIMIT_IP` (`300/minute`) |
+| Umbrella | user ID | every authenticated `/api/v1` request | `RATE_LIMIT_USER` (`120/minute`) |
+| Login | client IP | `POST /auth/login` | `RATE_LIMIT_LOGIN` (`10/minute`) |
+| Login | target email (hashed) | `POST /auth/login` | `RATE_LIMIT_LOGIN_ACCOUNT` (`10/15 minutes`) |
+| Register | client IP | `POST /auth/register` | `RATE_LIMIT_REGISTER` (`5/hour`) |
+| Password change | user ID | `POST /auth/change-password` | `RATE_LIMIT_CHANGE_PASSWORD` (`5/15 minutes`) |
+
+Rates read `<count>/<unit>` or `<count>/<n> <unit>s` (`second`, `minute`, `hour`, `day`) and are validated at startup like every other setting. Limits stack: a login request spends from the umbrella buckets *and* its own. Anonymous requests never touch the user bucket; a forged or expired token counts as anonymous.
+
+**Decisions and trade-offs**
+- **Fails open.** A Redis error, or no answer within 250 ms, skips the check, logs a warning and serves the request (the same contract as the cache). The counters live on `redis-cache` (LRU, no persistence), so an eviction or restart resets them. If that is not acceptable, give the limiter its own Redis.
+- **Per-email login limit** stops a distributed guess at one account, but anyone who knows an email can use up its budget and delay that user's logins for the window. Keep it generous, or set it very high to neutralise it.
+- **IPv6 clients are bucketed by `/64`** (they typically own 2^64 addresses); IPv4-mapped addresses are unwrapped.
+- **NAT:** users behind one address share the per-IP bucket, so keep `RATE_LIMIT_IP` generous and use the user limit for tight control.
+- Only routes that match are counted; a flood of 404s is not (the proxy's job).
+
+**Deployment prerequisite: the client IP.** The app uses the address uvicorn resolved (`request.client`) and ignores `X-Forwarded-For` itself. Behind a reverse proxy, set `FORWARDED_ALLOW_IPS` to the proxy's address or network (uvicorn already runs with `--proxy-headers`). Its default, `127.0.0.1`, usually does not match the peer of a containerised app (typically the Docker bridge gateway), and then every user shares the proxy's bucket. Check the address your proxy connects from. Never use `*`: uvicorn then trusts the left-most `X-Forwarded-For` entry, which the client controls. With an explicit list it takes the right-most untrusted entry, which a spoofed prefix cannot change.
+
+**Adding a limit** (rates belong in `Settings` so they can be tuned without a deploy):
+
+```python
+# module dependencies.py
+limit_export = rate_limit("reports:export", lambda s: s.rate_limit_export, key=by_user)
+
+# router.py
+@router.post("/export", dependencies=[Depends(limit_export)])
+```
+
+`key` is any `(Request, Settings) -> str | None` (`None` skips the limit): `by_ip` (default), `by_user`, or your own, e.g. an API-key header. A limit that needs the request body takes it as a parameter in a dependency that returns it (see `get_login_payload` in `app/modules/auth/dependencies.py`).
 
 ---
 
@@ -1077,6 +1112,7 @@ Prefer the reverse proxy/API gateway. If needed in-app, implement a Redis fixed/
 - [ ] Dependencies audited in CI (e.g. `uv run pip-audit`)
 - [ ] Redis not exposed publicly; Postgres not exposed publicly in production
 - [ ] TLS terminates at the reverse proxy/load balancer (not included in this repo)
+- [ ] If `RATE_LIMIT_ENABLED=true` behind a proxy: `FORWARDED_ALLOW_IPS` is the proxy's address/network, not `*` ([§11.8](#118-rate-limiting-optional-off-by-default))
 
 ---
 
@@ -1541,7 +1577,6 @@ Not in the core because not every project needs them. Add via ADR when justified
 | Email/SMS providers | A real notification feature exists (the stub task shows the pattern) |
 | File storage (S3) | Users upload files |
 | Prometheus/OpenTelemetry/Sentry | You have somewhere to send the data (add an optional `SENTRY_DSN`/OTel setting) |
-| Redis rate limiting | The proxy/gateway can't do it |
 | PgBouncer | Connection math in [§7.3](#73-rules) fails |
 | WebSockets / SSE | A real-time feature exists |
 | GraphQL, gRPC | A consumer requires it |
@@ -1576,3 +1611,8 @@ Create `docs/adr/0001-…` for each, one paragraph each (context, decision, cons
 | `JWT_SECRET_KEY` | **yes** | — | ≥ 32 random bytes in production |
 | `ACCESS_TOKEN_TTL_MINUTES` / `REFRESH_TOKEN_TTL_DAYS` | no | `15` / `7` | |
 | `WEB_CONCURRENCY` | no | `2` (prod compose) | Uvicorn workers per API container |
+| `RATE_LIMIT_ENABLED` | no | `false` | Opt-in rate limiting ([§11.8](#118-rate-limiting-optional-off-by-default)) |
+| `RATE_LIMIT_IP` / `RATE_LIMIT_USER` | no | `300/minute` / `120/minute` | Umbrella limits per client IP / per authenticated user |
+| `RATE_LIMIT_LOGIN` / `RATE_LIMIT_LOGIN_ACCOUNT` | no | `10/minute` / `10/15 minutes` | Login, per IP / per target email |
+| `RATE_LIMIT_REGISTER` / `RATE_LIMIT_CHANGE_PASSWORD` | no | `5/hour` / `5/15 minutes` | Registration per IP / password change per user |
+| `FORWARDED_ALLOW_IPS` | behind a proxy | `127.0.0.1` | Read by uvicorn: the proxy's address/network. Per-IP limits need it. Never `*` |

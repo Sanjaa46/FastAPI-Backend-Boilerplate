@@ -1,12 +1,15 @@
+import hashlib
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.dependencies import SessionDep, SettingsDep
 from app.core.exceptions import ForbiddenError, InvalidTokenError, UnauthorizedError
+from app.core.rate_limit import RateLimiterDep, by_user, enforce, rate_limit
 from app.core.security import decode_token
 from app.modules.auth.repository import RefreshTokenRepository
+from app.modules.auth.schemas import LoginRequest
 from app.modules.auth.service import AuthService
 from app.modules.users.dependencies import UserServiceDep
 from app.modules.users.exceptions import UserNotFoundError
@@ -49,6 +52,32 @@ async def get_current_superuser(
     return user
 
 
+# Stricter limits on top of the umbrella ones (they only apply with RATE_LIMIT_ENABLED=true).
+limit_login = rate_limit("auth:login", lambda s: s.rate_limit_login)
+limit_register = rate_limit("auth:register", lambda s: s.rate_limit_register)
+limit_change_password = rate_limit(
+    "auth:change-password", lambda s: s.rate_limit_change_password, key=by_user
+)
+
+
+async def get_login_payload(
+    payload: LoginRequest, request: Request, limiter: RateLimiterDep, settings: SettingsDep
+) -> LoginRequest:
+    """The login body, after counting the attempt against the targeted account.
+
+    Per email on top of per IP: a botnet guessing one account's password is caught although
+    every address stays under its own limit. Trade-off: someone who knows an email can burn
+    its budget and delay that user's logins for the window.
+    """
+    if settings.rate_limit_enabled:
+        email_hash = hashlib.sha256(payload.email.strip().lower().encode()).hexdigest()
+        await enforce(
+            request, limiter, "auth:login-account", email_hash, settings.rate_limit_login_account
+        )
+    return payload
+
+
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+LoginPayloadDep = Annotated[LoginRequest, Depends(get_login_payload)]
 CurrentUserDep = Annotated[UserRead, Depends(get_current_user)]
 SuperuserDep = Annotated[UserRead, Depends(get_current_superuser)]

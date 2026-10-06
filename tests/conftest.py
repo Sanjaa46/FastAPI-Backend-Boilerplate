@@ -25,6 +25,8 @@ os.environ.update(
         "REDIS_BROKER_URL": os.environ.get("TEST_REDIS_URL", "redis://localhost:6379") + "/14",
         "JWT_SECRET_KEY": "test-only-secret-test-only-secret-0123456789",
         "REGISTRATION_ENABLED": "true",
+        # Off, whatever the developer's .env says; rate-limit tests switch it on explicitly.
+        "RATE_LIMIT_ENABLED": "false",
     }
 )
 

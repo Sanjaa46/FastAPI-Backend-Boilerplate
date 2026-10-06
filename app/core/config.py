@@ -1,8 +1,39 @@
+import re
+from dataclasses import dataclass
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import PostgresDsn, RedisDsn, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BeforeValidator, PostgresDsn, RedisDsn, SecretStr, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+_RATE_RE = re.compile(r"(\d+)\s*/\s*(\d+)?\s*(second|minute|hour|day)s?", re.IGNORECASE)
+_UNIT_SECONDS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
+
+
+@dataclass(frozen=True, slots=True)
+class Rate:
+    """`limit` requests per `window_seconds`. Written "100/minute" or "10/15 minutes"."""
+
+    limit: int
+    window_seconds: int
+
+
+def _parse_rate(value: object) -> Rate:
+    if isinstance(value, Rate):
+        return value
+    match = _RATE_RE.fullmatch(str(value).strip())
+    if match is None:
+        raise ValueError(f"invalid rate {value!r}: use '<count>/<unit>', e.g. '100/minute'")
+    count, multiple, unit = match.groups()
+    limit, window_seconds = int(count), int(multiple or 1) * _UNIT_SECONDS[unit.lower()]
+    if limit < 1 or window_seconds < 1:
+        raise ValueError(f"invalid rate {value!r}: count and window must be at least 1")
+    return Rate(limit, window_seconds)
+
+
+# NoDecode: pydantic-settings would otherwise try to read the env value as JSON (a dataclass
+# counts as a complex type) and crash on "100/minute".
+RateSetting = Annotated[Rate, NoDecode, BeforeValidator(_parse_rate)]
 
 
 class Settings(BaseSettings):
@@ -40,6 +71,16 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 7
     registration_enabled: bool = True  # false => POST /auth/register returns 403
+
+    # --- Rate limiting (sliding window on redis-cache; see app/core/rate_limit.py) ---
+    # Rates: "<count>/<unit>" or "<count>/<n> <unit>s", e.g. "100/minute", "10/15 minutes".
+    rate_limit_enabled: bool = False  # opt-in: RATE_LIMIT_ENABLED=true
+    rate_limit_ip: RateSetting = Rate(300, 60)  # every /api/v1 request, per client IP
+    rate_limit_user: RateSetting = Rate(120, 60)  # every authenticated request, per user
+    rate_limit_login: RateSetting = Rate(10, 60)  # POST /auth/login, per client IP
+    rate_limit_login_account: RateSetting = Rate(10, 900)  # POST /auth/login, per target email
+    rate_limit_register: RateSetting = Rate(5, 3600)  # POST /auth/register, per client IP
+    rate_limit_change_password: RateSetting = Rate(5, 900)  # POST /auth/change-password, per user
 
     @model_validator(mode="after")
     def _reject_unsafe_production(self) -> "Settings":

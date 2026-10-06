@@ -1,12 +1,18 @@
 """HTTP surface for authentication. No SQL, no business logic."""
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.common.schemas import error_responses
-from app.modules.auth.dependencies import AuthServiceDep, CurrentUserDep
+from app.modules.auth.dependencies import (
+    AuthServiceDep,
+    CurrentUserDep,
+    LoginPayloadDep,
+    limit_change_password,
+    limit_login,
+    limit_register,
+)
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
-    LoginRequest,
     RefreshRequest,
     TokenPair,
 )
@@ -20,14 +26,20 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(403, 409, 422),
+    dependencies=[Depends(limit_register)],
 )
 async def register(payload: UserCreate, service: AuthServiceDep) -> UserRead:
     """Create an account. Disabled when REGISTRATION_ENABLED=false."""
     return await service.register(payload)
 
 
-@router.post("/login", response_model=TokenPair, responses=error_responses(401, 403, 422))
-async def login(payload: LoginRequest, service: AuthServiceDep) -> TokenPair:
+@router.post(
+    "/login",
+    response_model=TokenPair,
+    responses=error_responses(401, 403, 422),
+    dependencies=[Depends(limit_login)],
+)
+async def login(payload: LoginPayloadDep, service: AuthServiceDep) -> TokenPair:
     """Exchange email + password for an access/refresh token pair."""
     return await service.login(payload.email, payload.password)
 
@@ -56,7 +68,10 @@ async def logout_all(user: CurrentUserDep, service: AuthServiceDep) -> Response:
 
 
 @router.post(
-    "/change-password", response_model=TokenPair, responses=error_responses(400, 401, 403, 422)
+    "/change-password",
+    response_model=TokenPair,
+    responses=error_responses(400, 401, 403, 422),
+    dependencies=[Depends(limit_change_password)],
 )
 async def change_password(
     payload: ChangePasswordRequest, user: CurrentUserDep, service: AuthServiceDep

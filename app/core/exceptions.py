@@ -69,6 +69,18 @@ class ConflictError(AppError):
     code = "conflict"
 
 
+class TooManyRequestsError(AppError):
+    status_code = 429
+    code = "rate_limited"
+
+    def __init__(self, retry_after: int, headers: dict[str, str] | None = None) -> None:
+        super().__init__(
+            f"Rate limit exceeded. Try again in {retry_after}s.",
+            {"retry_after": retry_after},
+            headers={"Retry-After": str(retry_after), **(headers or {})},
+        )
+
+
 def _request_id() -> str | None:
     """Request ID bound by RequestContextMiddleware (None outside a request)."""
     value = structlog.contextvars.get_contextvars().get("request_id")
