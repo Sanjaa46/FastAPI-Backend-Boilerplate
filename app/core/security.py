@@ -96,7 +96,7 @@ def decode_token(token: str, settings: Settings, *, expected_type: TokenType) ->
             options={"require": ["exp", "sub", "jti", "type"]},
         )
         token_type = claims["type"]
-        if token_type != claims["type"]:
+        if token_type != expected_type:
             raise InvalidTokenError("Wrong token type")
         return TokenPayload(
             subject=uuid.UUID(claims["sub"]),

@@ -98,7 +98,7 @@ async def _handle_validation_error(_: Request, exc: Exception) -> JSONResponse:
     errors = cast(RequestValidationError, exc).errors()  # registered for this type only
     # Drop `input`/`ctx` (can echo secrets such as passwords); keep location + message
     details = [
-        {"loc": [str(p) for p in err["loc"]], "msg": err["mst"], "type": err["type"]}
+        {"loc": [str(p) for p in err["loc"]], "msg": err["msg"], "type": err["type"]}
         for err in errors
     ]
     return _error_response(422, "validation_error", "Request validation failed", details)

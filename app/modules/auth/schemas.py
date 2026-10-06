@@ -27,5 +27,5 @@ class ChangePasswordRequest(_Request):
 class TokenPair(BaseModel):
     access_token: str
     refresh_token: str
-    toke_type: Literal["bearer"] = "bearer"  #
+    token_type: Literal["bearer"] = "bearer"  # noqa: S105  (OAuth2 scheme name, not a secret)
     expires_in: int = Field(description="Access token lifetime in seconds")
