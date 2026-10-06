@@ -1,0 +1,62 @@
+name: fastapi-boilerplate
+
+x-app: &app
+  build: { context: ., target: dev }
+  env_file: .env
+  depends_on:
+    postgres:     { condition: service_healthy }
+    redis-cache:  { condition: service_healthy }
+    redis-broker: { condition: service_healthy }
+    migrate:      { condition: service_completed_successfully }
+  volumes: ["./app:/app/app", "./tests:/app/tests", "./migrations:/app/migrations"]
+
+services:
+  postgres:
+    image: postgres:17-alpine           # pin the major; upgrade deliberately
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis-cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    ports: ["6379:6379"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10 }
+
+  redis-broker:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: ["brokerdata:/data"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10 }
+
+  migrate:                               # one-shot: apply migrations, then exit
+    build: { context: ., target: dev }
+    env_file: .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on: { postgres: { condition: service_healthy } }
+
+  api:
+    <<: *app
+    ports: ["8000:8000"]
+
+  worker:
+    <<: *app
+    command: ["taskiq", "worker", "app.worker.broker:broker", "app.worker.tasks"]
+
+  scheduler:
+    <<: *app
+    command: ["taskiq", "scheduler", "app.worker.scheduler:scheduler", "app.worker.tasks"]
+
+volumes:
+  pgdata:
+  brokerdata:
