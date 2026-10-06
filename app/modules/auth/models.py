@@ -15,10 +15,10 @@ class RefreshToken(UUIDPrimaryKeyMixin, Base):
     Presenting an already-used token revokes the whol family (theft detection).
     """
 
-    __tablename__ = "refresh_token"
+    __tablename__ = "refresh_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE"), index=True
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     family_id: Mapped[uuid.UUID] = mapped_column(index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
