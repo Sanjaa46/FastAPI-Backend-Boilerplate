@@ -14,7 +14,7 @@ from app.core.config import Settings
 
 # Deterministic constraint names => stable, reviewable Alembic migrations.
 NAMING_CONVENTION = {
-    "ix": "ix_%(column_0_lables)s",
+    "ix": "ix_%(column_0_label)s",
     "uq": "uq%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
