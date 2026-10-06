@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from typing import Annotated
 
 from fastapi import Request
 from sqlalchemy import MetaData
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from taskiq import TaskiqDepends
 
 from app.core.config import Settings
 
@@ -42,7 +44,7 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
+async def get_session(request: Annotated[Request, TaskiqDepends()]) -> AsyncIterator[AsyncSession]:
     """One session per request. Does NOT commit; services own the transaction."""
     factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
     async with factory() as session:
