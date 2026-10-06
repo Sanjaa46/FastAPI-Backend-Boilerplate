@@ -21,3 +21,4 @@ htmlcov/
 .vscode/
 /tmp/
 node_modules/
+graphify-out
