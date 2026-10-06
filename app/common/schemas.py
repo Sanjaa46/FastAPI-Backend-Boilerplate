@@ -7,6 +7,8 @@ MAX_PAGE_SIZE = 100
 
 
 class PageParams(BaseModel):
+    """Offset pagination parameters with a hard upper bound."""
+
     limit: int = Field(default=20, ge=1, le=MAX_PAGE_SIZE)
     offset: int = Field(default=0, ge=0)
 
@@ -15,6 +17,7 @@ def _page_params(
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PageParams:
+    """Read ?limit=&offset= from the query string and validate them."""
     return PageParams(limit=limit, offset=offset)
 
 

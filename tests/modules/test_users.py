@@ -76,6 +76,7 @@ async def test_admin_list_is_paginated(
         await make_user(f"member{i}@example.com")
 
     page = await client.get(USERS, params={"limit": 2, "offset": 0}, headers=headers)
+    assert page.status_code == 200, page.text
     assert page.status_code == 200
     body = page.json()
     assert body["total"] == 5 and body["limit"] == 2 and body["offset"] == 0

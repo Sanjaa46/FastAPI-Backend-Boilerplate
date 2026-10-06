@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Response, status
 
-from app.common.schemas import Page, PageParams, error_responses
+from app.common.schemas import Page, PageParamsDep, error_responses
 from app.modules.auth.dependencies import CurrentUserDep, SuperuserDep
 from app.modules.users.dependencies import UserServiceDep
 from app.modules.users.schemas import AdminUserCreate, UserAdminUpdate, UserRead, UserUpdateMe
@@ -29,7 +29,7 @@ async def update_me(
 
 @router.get("", response_model=Page[UserRead], responses=error_responses(401, 403))
 async def list_users(
-    _: SuperuserDep, service: UserServiceDep, params: PageParams
+    _: SuperuserDep, service: UserServiceDep, params: PageParamsDep
 ) -> Page[UserRead]:
     return await service.list_users(params)
 
