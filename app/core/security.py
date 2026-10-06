@@ -57,7 +57,7 @@ def create_token(
     *,
     subject: uuid.UUID,
     kind: TokenType,
-    expired_delta: timedelta,
+    expires_delta: timedelta,
     settings: Settings,
     jti: uuid.UUID | None = None,
 ) -> tuple[str, TokenPayload]:
@@ -67,7 +67,7 @@ def create_token(
         subject=subject,
         jti=jti or uuid.uuid4(),
         type=kind,
-        expires_at=now + expired_delta,
+        expires_at=now + expires_delta,
     )
     claims = {
         "sub": str(payload.subject),

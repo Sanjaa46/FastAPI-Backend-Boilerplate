@@ -55,14 +55,14 @@ class AuthService:
         access, _ = create_token(
             subject=user_id,
             kind="access",
-            expired_delta=access_ttl,
+            expires_delta=access_ttl,
             settings=self._settings,
         )
         refresh_id = uuid.uuid4()
         refresh, claims = create_token(
             subject=user_id,
             kind="refresh",
-            expired_delta=timedelta(days=self._settings.refresh_token_ttl_days),
+            expires_delta=timedelta(days=self._settings.refresh_token_ttl_days),
             settings=self._settings,
             jti=refresh_id,
         )
