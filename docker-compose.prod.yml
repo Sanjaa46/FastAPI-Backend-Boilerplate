@@ -1,60 +1,55 @@
-# Run: docker compose -f docker-compose.pros.yml up -d
+# Run: docker compose -f docker-compose.prod.yml up -d
 x-app: &app
-  image: ${IMAGE}
-  env_file: .env.production
+  image: ${IMAGE}                       # built and pushed by CI, tagged with the git SHA
+  env_file: .env.production             # or platform secrets; never baked into the image
   restart: unless-stopped
-  init: true
-  stop_grace_period: 30s
+  init: true                            # reap zombie processes
+  stop_grace_period: 30s                # let in-flight requests/tasks finish
   depends_on:
-    redis_cache:  { condition: service_healthy }
-    redis_broker: { condition: service_healthy }
-
+    redis-cache:  { condition: service_healthy }
+    redis-broker: { condition: service_healthy }
 
 services:
   migrate:
     image: ${IMAGE}
     env_file: .env.production
-    command: ["alembid", "upgrade", "head"]
+    command: ["alembic", "upgrade", "head"]
     restart: "no"
-  
 
   api:
     <<: *app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "workers", "${WEB_CONCURRENCY:-2}", "--timeout-graceful-shutdown", "25"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--workers", "${WEB_CONCURRENCY:-2}",
+              "--timeout-graceful-shutdown", "25"]
     depends_on:
       migrate: { condition: service_completed_successfully }
-    ports: ["127.0.0.1:8000:8000"]
-    deploy: { resources: {limits: { cpus: "1.0", memory: 512M } } }
-  
+    ports: ["127.0.0.1:8000:8000"]      # reverse proxy on the host terminates TLS
+    deploy: { resources: { limits: { cpus: "1.0", memory: 512M } } }
 
   worker:
     <<: *app
     command: ["taskiq", "worker", "app.worker.broker:broker", "app.worker.tasks", "--workers", "2"]
     depends_on:
       migrate: { condition: service_completed_successfully }
-  
+
+  scheduler:                            # exactly one instance
+    <<: *app
+    command: ["taskiq", "scheduler", "app.worker.scheduler:scheduler", "app.worker.tasks"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
 
   redis-cache:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-  
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 3s, retries: 5 }
 
   redis-broker:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redi-server", "--append-only", "yes", "--maxmemory-policy", "neoviction"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes: ["brokerdata:/data"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 3s, retries: 5 }
 
 volumes:
   brokerdata:
