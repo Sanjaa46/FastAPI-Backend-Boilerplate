@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
     cors_origins: list[str] = []  # env: CORS_ORIGINS='["https://app.example.com"]'
+    trusted_hosts: list[str] = []  # env: TRUSTED_HOSTS='["api.example.com"]' (production only)
 
     # --- Logging ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
