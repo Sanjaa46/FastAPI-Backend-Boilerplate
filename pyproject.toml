@@ -5,7 +5,7 @@ description = "Add your description here"
 authors = [
     { name = "Д. Санжмятав", email = "sanjaas880@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",
     "asyncpg>=0.31.0",
@@ -28,7 +28,7 @@ package = false
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ASYNC", "S", "N", "SIM", "RUF", "C4", "PT"]

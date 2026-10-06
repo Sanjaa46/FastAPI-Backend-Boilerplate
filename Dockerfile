@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- base: python + uv ----------
-FROM python:3.12-slim-bookworm AS base
+FROM python:3.13-slim-bookworm AS base
 # Pin the uv image to a specific version tag in your repo (do not use :latest).
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_LINK_MODE=copy \
@@ -31,7 +31,7 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 
 # ---------- runtime: minimal, non-root ----------
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.13-slim-bookworm AS runtime
 RUN groupadd --system app && useradd --system --gid app --no-create-home app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
