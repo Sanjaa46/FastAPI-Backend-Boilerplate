@@ -10,7 +10,7 @@ class User(UUIDPrimaryKeyMixin, TimeStampMixin, Base):
     __tablename__ = "users"
     # Fetch server-generated values (updated_at) after UPDATE via RETURNING, so reading them
     # never triggers an implicit lazy load (which raises MissingGreenlet in async code).
-    __mapper_args__ = {"eager_defaults": True}
+    __mapper_args__ = {"eager_defaults": True}  # noqa: RUF012  (SQLAlchemy declarative idiom)
 
     email: Mapped[str] = mapped_column(String(320), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
